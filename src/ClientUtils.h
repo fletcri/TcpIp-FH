@@ -20,7 +20,12 @@ int connectSocket(struct addrinfo* serverAddr);
 int sendRequest(int socketDesc, struct RequestPacketDef* request);
 int receiveResponse(int socketDesc);
 int readStatus(FILE* stream);
+int readFiles(FILE* stream);
+int readFile(FILE* stream);
 
 #endif /* CLIENTUTILS_H_ */
 
 #define BUFFER_STATUS 100
+#define BUFFER_FILENAME 256
+#define BUFFER_FILENAME 256
+#define BUFFER_FILECHUNK 200

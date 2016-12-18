@@ -40,6 +40,7 @@ int main(int argc, char **argv) {
 	hints.ai_addr = NULL;
 	hints.ai_next = NULL;*/
 
+	//Get Endpoint-Address
 	fprintf(stderr, "Resolving server-address <%s>...\n", server);
 	addrError = getaddrinfo(server, port, &hints, &(serverAddr));
 	if(addrError != 0)
@@ -50,6 +51,7 @@ int main(int argc, char **argv) {
 
 	int socketDesc;
 
+	//Connecting to server
 	fprintf(stderr, "Connecting to server <%s:%s>...\n", server, port);
 	if((socketDesc = connectSocket(serverAddr)) < 0)
 	{
@@ -57,6 +59,7 @@ int main(int argc, char **argv) {
 		return ERROR_FAILED_TO_CONNECT;
 	}
 
+	//Sending request
 	fprintf(stderr, "Connection established! Sending request...\n");
 	RequestPacket request;
 	request.User = user;
@@ -68,12 +71,17 @@ int main(int argc, char **argv) {
 		return ERROR_SENDING_REQUEST;
 	}
 
+	//Receiving response
 	fprintf(stderr, "Request sent! Receiving response...\n");
 	if(receiveResponse(socketDesc) < 0)
 	{
 		fprintf(stderr, "Failed to receive response!\n");
 		return ERROR_RECEIVING_RESPONSE;
 	}
+
+	//Closing and Terminating
+	close(socketDesc);
+	freeaddrinfo(serverAddr);
 
 	fprintf(stderr, "Finished successfully!\n");
 	return EXIT_SUCCESS;

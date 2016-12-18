@@ -74,15 +74,19 @@ int sendRequest(int socketDesc, struct RequestPacketDef* request)
 		return -2;
 	}
 
-	fprintf(stderr, "Sending Username...\n");
-	if(fprintf(fw, "user=%s\n", request->User) < 0)
+	if(request->User != NULL && strlen(request->User) > 0)
 	{
-		fprintf(stderr, "Failed to send user-line!\n");
-		return -3;
+		fprintf(stderr, "Sending Username...\n");
+		if(fprintf(fw, "user=%s\n", request->User) < 0)
+		{
+			fprintf(stderr, "Failed to send user-line!\n");
+			return -3;
+		}
 	}
 
-	if(request->Image != NULL)
+	if(request->Image != NULL && strlen(request->Image) > 0)
 	{
+		fprintf(stderr, "Sending Image...\n");
 		if(fprintf(fw, "img=%s\n", request->Image) < 0)
 		{
 			fprintf(stderr, "Failed to send image-line!\n");
@@ -90,8 +94,9 @@ int sendRequest(int socketDesc, struct RequestPacketDef* request)
 		}
 	}
 
-	if(request->Message != NULL)
+	if(request->Message != NULL && strlen(request->Message) > 0)
 	{
+		fprintf(stderr, "Sending Message...\n");
 		if(fprintf(fw, "%s", request->Message) < 0)
 		{
 			fprintf(stderr, "Failed to send message!\n");
@@ -130,19 +135,31 @@ int receiveResponse(int socketDesc)
 
 	if(readStatus(fr) < 0)
 	{
-		fprintf(stderr, "Failed to read status!");
+		fprintf(stderr, "Failed to read status!\n");
 		return -3;
 	}
 
+	int readResult = readFiles(fr);
+	if(readResult < 0)
+	{
+		fprintf(stderr, "Failed to read files!\n");
+		return -3;
+	}
+	else
+	{
+		fprintf(stderr, "Received <%i> files!\n", readResult);
+	}
 
+	fprintf(stderr, "Finished receiving response!\n");
+	shutdown(sdr, SHUT_RD);
+	fclose(fr);
 
-	fprintf(stderr, "Received status!\n");
 	return 0;
 }
 
 int readStatus(FILE* stream)
 {
-	char statusBuffer[200];
+	char statusBuffer[BUFFER_STATUS * sizeof(char)];
 	//statusBuffer = malloc(BUFFER_STATUS * sizeof(char));
 	/*if(statusBuffer == NULL)
 	{
@@ -172,4 +189,120 @@ int readStatus(FILE* stream)
 		fprintf(stderr, "Status is <%c> WRONG!\n", *(statusBuffer + 7));
 		return -3;
 	}
+}
+
+int readFiles(FILE* stream)
+{
+	int readResult;
+	int fileCount = 0;
+
+	while((readResult = readFile(stream)) > 0)
+	{
+		fileCount++;
+	}
+
+	if(readResult == 0)
+		readResult = fileCount;
+
+	return readResult;
+}
+
+int readFile(FILE* stream)
+{
+	char fileNameBuffer[BUFFER_FILENAME * sizeof(char)];
+
+	if(fgets(fileNameBuffer, sizeof(fileNameBuffer), stream) == NULL)
+	{
+		fprintf(stderr, "No more FileNames available!\n");
+		return 0;
+	}
+
+	char fileName[strlen(fileNameBuffer) - 5];
+
+	if (*(fileNameBuffer + strlen(fileNameBuffer) - 1) == '\n')
+	{
+		*(fileNameBuffer + strlen(fileNameBuffer) - 1) = '\0';
+	}
+
+	if (strncmp("file=", fileNameBuffer, 5) != 0)
+	{
+		fprintf(stderr, "Protocoll-Error! Invalid file-field!\n");
+		return -1;
+	}
+
+	strncpy(&fileName, (fileNameBuffer + 5), sizeof(fileName));
+
+	char fileSizeBuffer[BUFFER_FILENAME * sizeof(char)];
+	unsigned long fileLength;
+
+	if(fgets(fileSizeBuffer, sizeof(fileSizeBuffer), stream) == NULL)
+	{
+		fprintf(stderr, "Failed to read FileSize!");
+		return -2;
+	}
+
+	if (*(fileSizeBuffer + strlen(fileSizeBuffer) - 1) == '\n')
+	{
+		*(fileSizeBuffer + strlen(fileSizeBuffer) - 1) = '\0';
+	}
+
+	if (strncmp("len=", fileSizeBuffer, 4) != 0)
+	{
+		fprintf(stderr, "Protocoll-Error! Invalid len-field!\n");
+		return -1;
+	}
+
+	char* parseEnd;
+	fileLength = strtol(fileSizeBuffer + 4, &parseEnd, 10);
+	if(fileLength <= 0)
+	{
+		fprintf(stderr, "Protocoll-Error! Invalid or zero FileLength!\n");
+		return -1;
+	}
+
+	fprintf(stderr, "Receiving File <%s> with Length <%lu>....\n", fileName, fileLength);
+
+	FILE* file;
+	if((file = fopen(fileName, "w")) == NULL)
+	{
+		fprintf(stderr, "Failed to open File <%s>!\n", fileName);
+		return -3;
+	}
+
+	unsigned long stillToRead = fileLength;
+
+	while(stillToRead > 0)
+	{
+		char fileChunkBuffer[BUFFER_FILECHUNK * sizeof(char)];
+		size_t readCount = (stillToRead < BUFFER_FILECHUNK) ? (size_t)stillToRead : BUFFER_FILECHUNK;
+
+		if(fread(fileChunkBuffer, sizeof(char), readCount, stream) != readCount)
+		{
+			if(feof(stream))
+			{
+				fprintf(stderr, "EOF happened before receiving the full file!\n");
+				return -3;
+			}
+			else
+			{
+				fprintf(stderr, "Failed to read file!\n");
+				return -3;
+			}
+			fclose(file);
+		}
+
+		if(fwrite(fileChunkBuffer, sizeof(char), readCount, file) != readCount)
+		{
+			fprintf(stderr, "Failed to write data to file <%s>!\n", fileName);
+			fclose(file);
+			return -3;
+		}
+
+		stillToRead -= readCount;
+	}
+
+	fclose(file);
+	fprintf(stderr, "Finished writing file <%s>!\n", fileName);
+
+	return 1;
 }
