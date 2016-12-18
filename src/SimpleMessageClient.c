@@ -15,6 +15,7 @@
 void parsingFailed(FILE* file, const char* message, int value)
 {
 	printHelp();
+	exit(EXIT_HELPPAGE);
 }
 
 int main(int argc, char **argv) {
@@ -34,11 +35,12 @@ int main(int argc, char **argv) {
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = IPPROTO_TCP;
-	hints.ai_flags = AI_PASSIVE;
+	/*hints.ai_flags = AI_PASSIVE;
 	hints.ai_canonname = NULL;
 	hints.ai_addr = NULL;
-	hints.ai_next = NULL;
+	hints.ai_next = NULL;*/
 
+	fprintf(stderr, "Resolving server-address <%s>...\n", server);
 	addrError = getaddrinfo(server, port, &hints, &(serverAddr));
 	if(addrError != 0)
 	{
@@ -48,20 +50,31 @@ int main(int argc, char **argv) {
 
 	int socketDesc;
 
+	fprintf(stderr, "Connecting to server <%s:%s>...\n", server, port);
 	if((socketDesc = connectSocket(serverAddr)) < 0)
 	{
+		fprintf(stderr, "Failed to connect to server <%s:%s>!\n", server, port);
 		return ERROR_FAILED_TO_CONNECT;
 	}
 
-	RequestPacket* request;
-	request->User = user;
-	request->Image = img_url;
-	request->Message = message;
-	if(sendRequest(socketDesc, request) < 0)
+	fprintf(stderr, "Connection established! Sending request...\n");
+	RequestPacket request;
+	request.User = user;
+	request.Image = img_url;
+	request.Message = message;
+	if(sendRequest(socketDesc, &request) < 0)
 	{
+		fprintf(stderr, "Failed to send request!\n");
 		return ERROR_SENDING_REQUEST;
 	}
 
-	fprintf(stdout, "Finished successfully!");
+	fprintf(stderr, "Request sent! Receiving response...\n");
+	if(receiveResponse(socketDesc) < 0)
+	{
+		fprintf(stderr, "Failed to receive response!\n");
+		return ERROR_RECEIVING_RESPONSE;
+	}
+
+	fprintf(stderr, "Finished successfully!\n");
 	return EXIT_SUCCESS;
 }
