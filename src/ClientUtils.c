@@ -1,3 +1,18 @@
+/**
+ * @file ClientUtils.c
+ * SimpleMessageClient
+ * TCPIP Project
+ *
+ * @author Christoph Fletzer <ic16b014@technikum-wien.at>
+ * @date 2016/12/19
+ *
+ * @version 001
+ *
+ */
+
+/*
+ * -------------------------------------------------------------- includes --
+ */
 #include <stddef.h>
 #include <stdio.h>
 #include <netdb.h>
@@ -5,7 +20,69 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include "ClientUtils.h"
+#include <stdarg.h>
+#include <libgen.h>
+/*
+ * --------------------------------------------------------------- globals --
+ */
+static char* programName;
+static int verboseMode = 0;
+/*
+ * ------------------------------------------------------------- functions --
+ */
+/**
+ *
+ * \brief Initializes the logger
+ *
+ * \param verbose Verbose-Mode
+ * \param progName The Program-Name
+ *
+ * \return void
+ * \retval void
+ *
+ */
+void initLog(int verbose, char* progName)
+{
+	verboseMode = verbose;
+	programName = basename(progName);
 
+	log(3, "Verbose-Mode is activated!\n");
+}
+/**
+ *
+ * \brief Logs messages to the console
+ *
+ * \param logLevel The loglevel used
+ * \param logMessage The Format-Message to log out
+ *
+ * \return void
+ * \retval void
+ *
+ */
+void log(int logLevel, char* logMessage, ...)
+{
+	 va_list args;
+	 va_start(args, logMessage);
+	 if(logLevel == 1)
+	 {
+		 fprintf(stderr, "[%s] - LogLevel <%i>: ", programName, logLevel);
+		 vfprintf(stderr, logMessage, args);
+	 }
+	 else if (verboseMode == 1)
+	 {
+		 fprintf(stdout, "[%s] - LogLevel <%i>: ", programName, logLevel);
+		 vfprintf(stdout, logMessage, args);
+	 }
+	 va_end(args);
+}
+/**
+ *
+ * \brief Prints the Help-Page
+ *
+ * \return void
+ * \retval void
+ *
+ */
 void printHelp()
 {
 	static char* helpLines[] =
@@ -24,11 +101,20 @@ void printHelp()
 	int lineIndex = 0;
 	while(helpLines[lineIndex] != NULL)
 	{
-		fprintf(stdout, helpLines[lineIndex]);
+		log(stdout, helpLines[lineIndex]);
 		lineIndex++;
 	}
 }
-
+/**
+ *
+ * \brief Connects to the server
+ *
+ * \param serverAddr The Server-Address
+ *
+ * \return int
+ * \retval error-codes
+ *
+ */
 int connectSocket(struct addrinfo* serverAddr)
 {
 	int socketDesc = 0;
@@ -55,58 +141,68 @@ int connectSocket(struct addrinfo* serverAddr)
 
 	return socketDesc;
 }
-
+/**
+ *
+ * \brief Send the request to the server
+ *
+ * \param socketDesc The Socket-Descriptor used
+ * \param request The request packet
+ *
+ * \return int
+ * \retval error-codes
+ *
+ */
 int sendRequest(int socketDesc, struct RequestPacketDef* request)
 {
 	int sdw;
-	fprintf(stderr, "Dup SocketDescriptor...\n");
+	log(LOG_INFO, "Dup SocketDescriptor...\n");
 	if((sdw = dup(socketDesc)) < 0)
 	{
-		fprintf(stderr, "Failed to duplicate SocketDescriptor(write)!\n");
+		log(LOG_ERROR, "Failed to duplicate SocketDescriptor(write)!\n");
 		return -1;
 	}
 
-	fprintf(stderr, "Opening FileDescriptor...\n");
+	log(LOG_INFO, "Opening FileDescriptor...\n");
 	FILE* fw;
 	if((fw = fdopen(sdw, "w")) == NULL)
 	{
-		fprintf(stderr, "Failed to open FileDescriptor(write)!\n");
+		log(LOG_ERROR, "Failed to open FileDescriptor(write)!\n");
 		return -2;
 	}
 
 	if(request->User != NULL && strlen(request->User) > 0)
 	{
-		fprintf(stderr, "Sending Username...\n");
+		log(LOG_INFO, "Sending Username...\n");
 		if(fprintf(fw, "user=%s\n", request->User) < 0)
 		{
-			fprintf(stderr, "Failed to send user-line!\n");
+			log(LOG_ERROR, "Failed to send user-line!\n");
 			return -3;
 		}
 	}
 
 	if(request->Image != NULL && strlen(request->Image) > 0)
 	{
-		fprintf(stderr, "Sending Image...\n");
+		log(LOG_INFO, "Sending Image...\n");
 		if(fprintf(fw, "img=%s\n", request->Image) < 0)
 		{
-			fprintf(stderr, "Failed to send image-line!\n");
+			log(LOG_ERROR, "Failed to send image-line!\n");
 			return -3;
 		}
 	}
 
 	if(request->Message != NULL && strlen(request->Message) > 0)
 	{
-		fprintf(stderr, "Sending Message...\n");
+		log(LOG_INFO, "Sending Message...\n");
 		if(fprintf(fw, "%s", request->Message) < 0)
 		{
-			fprintf(stderr, "Failed to send message!\n");
+			log(LOG_ERROR, "Failed to send message!\n");
 			return -3;
 		}
 	}
 
 	if(fflush(fw) == EOF)
 	{
-		fprintf(stderr, "Failed to flush write-stream!\n");
+		log(LOG_ERROR, "Failed to flush write-stream!\n");
 		return -3;
 	}
 
@@ -116,81 +212,109 @@ int sendRequest(int socketDesc, struct RequestPacketDef* request)
 	return 0;
 }
 
+/**
+ *
+ * \brief Receives the response from the server
+ *
+ * \param socketDesc The Socket-Descriptor used
+ *
+ * \return int
+ * \retval error-codes
+ *
+ */
 int receiveResponse(int socketDesc)
 {
 	int sdr;
 
 	if((sdr = dup(socketDesc)) < 0)
 	{
-		fprintf(stderr, "Failed to duplicate SocketDescriptor(read)!\n");
+		log(LOG_ERROR, "Failed to duplicate SocketDescriptor(read)!\n");
 		return -1;
 	}
 
 	FILE* fr;
 	if((fr = fdopen(sdr, "r")) == NULL)
 	{
-		fprintf(stderr, "Failed to open FileDescriptor(read)!\n");
+		log(LOG_ERROR, "Failed to open FileDescriptor(read)!\n");
 		return -2;
 	}
 
 	if(readStatus(fr) < 0)
 	{
-		fprintf(stderr, "Failed to read status!\n");
+		log(LOG_ERROR, "Failed to read status!\n");
 		return -3;
 	}
 
 	int readResult = readFiles(fr);
 	if(readResult < 0)
 	{
-		fprintf(stderr, "Failed to read files!\n");
+		log(LOG_ERROR, "Failed to read files!\n");
 		return -3;
 	}
 	else
 	{
-		fprintf(stderr, "Received <%i> files!\n", readResult);
+		log(LOG_INFO, "Received <%i> files!\n", readResult);
 	}
 
-	fprintf(stderr, "Finished receiving response!\n");
+	log(LOG_INFO, "Finished receiving response!\n");
 	shutdown(sdr, SHUT_RD);
 	fclose(fr);
 
 	return 0;
 }
-
+/**
+ *
+ * \brief Receives the server status response
+ *
+ * \param stream The file-stream to the server
+ *
+ * \return int
+ * \retval error-codes
+ *
+ */
 int readStatus(FILE* stream)
 {
 	char statusBuffer[BUFFER_STATUS * sizeof(char)];
 	//statusBuffer = malloc(BUFFER_STATUS * sizeof(char));
 	/*if(statusBuffer == NULL)
 	{
-		fprintf(stderr, "Failed to allocate statusBuffer!\n");
+		log(stderr, "Failed to allocate statusBuffer!\n");
 		return -3;
 	}*/
 
 	if(fgets(statusBuffer, sizeof(statusBuffer), stream) == NULL)
 	{
-		fprintf(stderr, "Failed to receive statusBuffer!\n");
+		log(LOG_ERROR, "Failed to receive statusBuffer!\n");
 		return -1;
 	}
 
 	if(strncmp("status=", statusBuffer, 7) != 0)
 	{
-		fprintf(stderr, "Protocoll-Error! Invalid status-field!\n");
+		log(LOG_ERROR, "Protocoll-Error! Invalid status-field!\n");
 		return -2;
 	}
 
 	if(*(statusBuffer + 7) == '0')
 	{
-		fprintf(stderr, "Status is <%c> OK!\n", *(statusBuffer + 7));
+		log(LOG_INFO, "Status is <%c> OK!\n", *(statusBuffer + 7));
 		return 1;
 	}
 	else
 	{
-		fprintf(stderr, "Status is <%c> WRONG!\n", *(statusBuffer + 7));
+		log(LOG_ERROR, "Status is <%c> WRONG!\n", *(statusBuffer + 7));
 		return -3;
 	}
 }
-
+/**
+ *
+ * \brief Receives the files from the server
+ *
+ * \param stream The file-stream to the server
+ *
+ * \return int
+ * \retval error-codes
+ *
+ */
 int readFiles(FILE* stream)
 {
 	int readResult;
@@ -206,14 +330,23 @@ int readFiles(FILE* stream)
 
 	return readResult;
 }
-
+/**
+ *
+ * \brief Receives the file from the server
+ *
+ * \param stream The file-stream to the server
+ *
+ * \return int
+ * \retval error-codes
+ *
+ */
 int readFile(FILE* stream)
 {
 	char fileNameBuffer[BUFFER_FILENAME * sizeof(char)];
 
 	if(fgets(fileNameBuffer, sizeof(fileNameBuffer), stream) == NULL)
 	{
-		fprintf(stderr, "No more FileNames available!\n");
+		log(LOG_INFO, "No more FileNames available!\n");
 		return 0;
 	}
 
@@ -226,9 +359,16 @@ int readFile(FILE* stream)
 
 	if (strncmp("file=", fileNameBuffer, 5) != 0)
 	{
-		fprintf(stderr, "Protocoll-Error! Invalid file-field!\n");
+		log(LOG_ERROR, "Protocoll-Error! Invalid file-field!\n");
 		return -1;
 	}
+
+	/*if (strncmp("file=/dev/null", fileNameBuffer, 14) == 0)
+	{
+		log(LOG_ERROR, "BAD TEACHER! The server is running test-case TESTCASE_HUGE_FILE! That's not nice =(\n");
+		memset(fileNameBuffer,0,sizeof(fileNameBuffer));
+		strncpy(fileNameBuffer, "badboy", sizeof(6));
+	}*/
 
 	strncpy(&fileName, (fileNameBuffer + 5), sizeof(fileName));
 
@@ -237,7 +377,7 @@ int readFile(FILE* stream)
 
 	if(fgets(fileSizeBuffer, sizeof(fileSizeBuffer), stream) == NULL)
 	{
-		fprintf(stderr, "Failed to read FileSize!");
+		log(LOG_ERROR, "Failed to read FileSize!");
 		return -2;
 	}
 
@@ -248,7 +388,7 @@ int readFile(FILE* stream)
 
 	if (strncmp("len=", fileSizeBuffer, 4) != 0)
 	{
-		fprintf(stderr, "Protocoll-Error! Invalid len-field!\n");
+		log(LOG_ERROR, "Protocoll-Error! Invalid len-field!\n");
 		return -1;
 	}
 
@@ -256,16 +396,16 @@ int readFile(FILE* stream)
 	fileLength = strtol(fileSizeBuffer + 4, &parseEnd, 10);
 	if(fileLength <= 0)
 	{
-		fprintf(stderr, "Protocoll-Error! Invalid or zero FileLength!\n");
+		log(LOG_ERROR, "Protocoll-Error! Invalid or zero FileLength!\n");
 		return -1;
 	}
 
-	fprintf(stderr, "Receiving File <%s> with Length <%lu>....\n", fileName, fileLength);
+	log(LOG_INFO, "Receiving File <%s> with Length <%lu>....\n", fileName, fileLength);
 
 	FILE* file;
 	if((file = fopen(fileName, "w")) == NULL)
 	{
-		fprintf(stderr, "Failed to open File <%s>!\n", fileName);
+		log(LOG_ERROR, "Failed to open File <%s>!\n", fileName);
 		return -3;
 	}
 
@@ -280,12 +420,12 @@ int readFile(FILE* stream)
 		{
 			if(feof(stream))
 			{
-				fprintf(stderr, "EOF happened before receiving the full file!\n");
+				log(LOG_ERROR, "EOF happened before receiving the full file!\n");
 				return -3;
 			}
 			else
 			{
-				fprintf(stderr, "Failed to read file!\n");
+				log(LOG_ERROR, "Failed to read file!\n");
 				return -3;
 			}
 			fclose(file);
@@ -293,7 +433,7 @@ int readFile(FILE* stream)
 
 		if(fwrite(fileChunkBuffer, sizeof(char), readCount, file) != readCount)
 		{
-			fprintf(stderr, "Failed to write data to file <%s>!\n", fileName);
+			log(LOG_ERROR, "Failed to write data to file <%s>!\n", fileName);
 			fclose(file);
 			return -3;
 		}
@@ -302,7 +442,7 @@ int readFile(FILE* stream)
 	}
 
 	fclose(file);
-	fprintf(stderr, "Finished writing file <%s>!\n", fileName);
+	log(LOG_INFO, "Finished writing file <%s>!\n", fileName);
 
 	return 1;
 }

@@ -1,5 +1,7 @@
 LDFLAGS += -L/usr/local/lib
 
+CFLAGS: -Wall -Werror -Wextra -Wstrict-prototypes -pedantic -fno-common -O3 -g -std=gnu11
+
 all: SimpleMessageClient
 
 clean:
