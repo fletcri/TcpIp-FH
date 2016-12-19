@@ -1,0 +1,18 @@
+/**
+ * @file README
+ * Readme-File
+ * SimpleMessageClient
+ * TCPIP Project
+ *
+ * @author Christoph Fletzer <ic16b014@technikum-wien.at>
+ * @date 2016/12/19
+ *
+ * @version 001
+ *
+ */
+ 
+ Files:
+ ClientUtils.c/h -> Contains the client's Connection-Logic 
+ SimpleMessageClient-c/h -> Contains the programs logic (startpoint)
+ simple_message_client_commandline_handling.c -> Parameter parsing lib
+ makefile -> clean/all

@@ -1,5 +1,6 @@
 /**
  * @file SimpleMessageClient.h
+ * Client Program
  * SimpleMessageClient
  * TCPIP Project
  *

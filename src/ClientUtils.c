@@ -1,5 +1,6 @@
 /**
  * @file ClientUtils.c
+ * Client-Logic
  * SimpleMessageClient
  * TCPIP Project
  *
@@ -27,6 +28,7 @@
  */
 static char* programName;
 static int verboseMode = 0;
+
 /*
  * ------------------------------------------------------------- functions --
  */
@@ -41,6 +43,10 @@ static int verboseMode = 0;
  * \retval void
  *
  */
+
+static int readStatus(FILE* stream);
+static int readFile(FILE* stream);
+
 void initLog(int verbose, char* progName)
 {
 	verboseMode = verbose;

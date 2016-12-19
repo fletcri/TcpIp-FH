@@ -1,5 +1,6 @@
 /**
  * @file ClientUtils.h
+ * Client-Logic
  * SimpleMessageClient
  * TCPIP Project
  *
@@ -37,9 +38,9 @@ void log(int logLevel, char* logMessage, ...);
 int connectSocket(struct addrinfo* serverAddr);
 int sendRequest(int socketDesc, struct RequestPacketDef* request);
 int receiveResponse(int socketDesc);
-int readStatus(FILE* stream);
 int readFiles(FILE* stream);
-int readFile(FILE* stream);
+//static int readStatus(FILE* stream);
+//static int readFile(FILE* stream);
 
 #endif /* CLIENTUTILS_H_ */
 /*
